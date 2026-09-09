@@ -34,7 +34,7 @@ if (!empty($_REQUEST['pageId'])) {
 /** @var FetchIt $FetchIt */
 $FetchIt = $modx->services->get('FetchIt');
 
-if (!isset($_POST)) {
+if (empty($_POST)) {
     $modx->sendRedirect($modx->makeUrl($modx->getOption('site_start'), '', '', 'full'));
 } elseif (empty($_SERVER['HTTP_X_FETCHIT_ACTION'])) {
     echo $FetchIt->error('fetchit_err_action_ns');

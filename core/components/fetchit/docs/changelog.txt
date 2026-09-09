@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.4] - 2026-09-09
+
+### Fixed
+
+- Form-level success and validation messages now update in the form on AJAX submit via `[data-success]` and `[data-validation-error]` (#15). Custom templates need these attributes instead of `[[+fi.success:…]]` conditionals for AJAX.
+- Whitespace-only FormIt field errors (e.g. `fi.error.email`) no longer mark the form as failed (#14). Placeholders are sanitized with `strip_tags` and `html_entity_decode`; blank `validation_error_message` falls back to the lexicon key.
+- PHP 8 warning for undefined `$_SESSION['fetchit_called']` in `registerScript()` (#13).
+- PHP 8 warnings for undefined `$_SESSION['FetchIt']` when saving or reading snippet properties.
+- Dead `!isset($_POST)` check in `action.php` replaced with `empty($_POST)` so GET requests redirect correctly.
+- Custom `successMessage` from the FetchIt snippet call is used in the AJAX success response.
+
+### Changed
+
+- Frontend build dependencies bumped to Rollup 4; CI and release workflows added for the `next` branch (MODX 3.2.4-pl build host).
+
 ## [3.1.3] - 2026-07-21
 
 ### Fixed
