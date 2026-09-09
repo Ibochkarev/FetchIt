@@ -43,6 +43,7 @@
         this.formData.set('pageId', this.config.pageId);
 
         this.clearErrors();
+        this.clearFormMessages();
 
         const beforeEvent = new CustomEvent(FetchIt.events.before, {
           cancelable: true,
@@ -99,13 +100,20 @@
             }
 
             for (const [ name, message ] of Object.entries(response.data)) {
+              if (!FetchIt.hasErrorMessage(message)) {
+                continue;
+              }
+
               this.setError(name, message);
             }
+
+            this.setFormMessage('validation', response.message);
 
             return;
           }
 
           this.clearErrors();
+          this.setFormMessage('success', response.message);
           FetchIt?.Message?.success?.(response.message);
 
           const successEvent = new CustomEvent(FetchIt.events.success, {
@@ -126,7 +134,9 @@
           }
 
           if (this.config.clearFieldsOnSuccess) {
+            this.preserveFormMessagesOnReset = true;
             this.form.reset();
+            this.preserveFormMessagesOnReset = false;
           }
         } catch (e) {
           console.error(e);
@@ -145,6 +155,9 @@
 
         document.dispatchEvent(resetEvent);
         this.clearErrors();
+        if (!this.preserveFormMessagesOnReset) {
+          this.clearFormMessages();
+        }
         FetchIt?.Message?.reset?.();
       });
 
@@ -188,6 +201,10 @@
     }
 
     setError (name, message = '') {
+      if (!FetchIt.hasErrorMessage(message)) {
+        return;
+      }
+
       this.getFields(name).forEach(field => {
         if (this.inputInvalidClasses) {
           field.classList.add(...this.inputInvalidClasses);
@@ -204,8 +221,36 @@
       }
 
       this.getErrors(name).forEach(error => {
+        const safeMessage = FetchIt.sanitizeHTML(String(message)).trim();
         error.style.display = '';
-        error.innerHTML = message;
+        error.textContent = safeMessage;
+      });
+    }
+
+    clearFormMessages () {
+      this.form.querySelectorAll('[data-success], [data-validation-error]').forEach(element => {
+        element.style.display = 'none';
+        element.textContent = '';
+      });
+    }
+
+    setFormMessage (type, message = '') {
+      const safeMessage = FetchIt.sanitizeHTML(String(message)).trim();
+      if (safeMessage === '') {
+        return;
+      }
+
+      const showSelector = type === 'success' ? '[data-success]' : '[data-validation-error]';
+      const hideSelector = type === 'success' ? '[data-validation-error]' : '[data-success]';
+
+      this.form.querySelectorAll(hideSelector).forEach(element => {
+        element.style.display = 'none';
+        element.textContent = '';
+      });
+
+      this.form.querySelectorAll(showSelector).forEach(element => {
+        element.style.display = '';
+        element.textContent = safeMessage;
       });
     }
 
@@ -259,6 +304,10 @@
 
     static sanitizeHTML (str = '') {
       return str.replace(/(<([^>]+)>)/gi, '');
+    }
+
+    static hasErrorMessage (message = '') {
+      return FetchIt.sanitizeHTML(String(message)).trim() !== '';
     }
 
     static create(config) {

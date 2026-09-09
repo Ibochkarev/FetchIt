@@ -4,7 +4,7 @@ namespace FetchIt;
 
 class FetchIt
 {
-    public $version = '3.1.3';
+    public $version = '3.1.4';
     /** @var modX $modx */
     public $modx;
     /** @var array $config */
@@ -53,7 +53,9 @@ class FetchIt
      */
     public function loadScript($action)
     {
-        $_SESSION['fetchit_called'] = true;
+        if (!empty(session_id())) {
+            $_SESSION['fetchit_called'] = true;
+        }
 
         $config = $this->modx->toJSON([
             'action' => $action,
@@ -78,7 +80,7 @@ class FetchIt
 
     public function registerScript()
     {
-        if (!$_SESSION['fetchit_called']) {
+        if (empty($_SESSION['fetchit_called'])) {
             return;
         }
 
@@ -130,6 +132,9 @@ class FetchIt
         }
 
         if (!empty(session_id())) {
+            if (!isset($_SESSION['FetchIt'])) {
+                $_SESSION['FetchIt'] = array();
+            }
             $_SESSION['FetchIt'][$action] = $scriptProperties;
         } else {
             $this->modx->cacheManager->set('fetchit/props_' . $action, $scriptProperties, 3600);
@@ -208,6 +213,35 @@ class FetchIt
 
 
     /**
+     * @param string $key
+     *
+     * @return string
+     */
+    protected function getSanitizedPlaceholder($key)
+    {
+        if (!isset($this->modx->placeholders[$key])) {
+            return '';
+        }
+
+        $value = html_entity_decode((string)$this->modx->placeholders[$key], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim(strip_tags($value));
+    }
+
+
+    /**
+     * @param string $plPrefix
+     * @param string $field
+     *
+     * @return string
+     */
+    protected function getFieldError($plPrefix, $field)
+    {
+        return $this->getSanitizedPlaceholder($plPrefix . 'error.' . $field);
+    }
+
+
+    /**
      * Method for obtaining data from FormIt
      *
      * @param array $scriptProperties
@@ -222,32 +256,32 @@ class FetchIt
 
         $errors = array();
         foreach ($scriptProperties['fields'] as $k => $v) {
-            if (isset($this->modx->placeholders[$plPrefix . 'error.' . $k])) {
-                $errors[$k] = $this->modx->placeholders[$plPrefix . 'error.' . $k];
+            $error = $this->getFieldError($plPrefix, $k);
+            if ($error !== '') {
+                $errors[$k] = $error;
             }
         }
 
-        if (!empty($this->modx->placeholders[$plPrefix . 'error.recaptcha'])) {
-            $errors['recaptcha'] = $this->modx->placeholders[$plPrefix . 'error.recaptcha'];
-        }
-
-        if (!empty($this->modx->placeholders[$plPrefix . 'error.recaptchav2_error'])) {
-            $errors['recaptcha'] = $this->modx->placeholders[$plPrefix . 'error.recaptchav2_error'];
-        }
-
-        if (!empty($this->modx->placeholders[$plPrefix . 'error.recaptchav3_error'])) {
-            $errors['recaptcha'] = $this->modx->placeholders[$plPrefix . 'error.recaptchav3_error'];
+        foreach (array('recaptcha', 'recaptchav2_error', 'recaptchav3_error') as $recaptchaField) {
+            $error = $this->getFieldError($plPrefix, $recaptchaField);
+            if ($error !== '') {
+                $errors['recaptcha'] = $error;
+                break;
+            }
         }
 
         if (!empty($errors)) {
-            $message = !empty($this->modx->placeholders[$plPrefix . 'validation_error_message'])
-                ? $this->modx->placeholders[$plPrefix . 'validation_error_message']
-                : 'fetchit_err_has_errors';
+            $message = $this->getSanitizedPlaceholder($plPrefix . 'validation_error_message');
+            if ($message === '') {
+                $message = 'fetchit_err_has_errors';
+            }
             $status = 'error';
         } else {
-            $message = isset($this->modx->placeholders[$plPrefix . 'successMessage'])
-                ? $this->modx->placeholders[$plPrefix . 'successMessage']
-                : 'fetchit_success_submit';
+            $message = !empty($scriptProperties['successMessage'])
+                ? $scriptProperties['successMessage']
+                : (isset($this->modx->placeholders[$plPrefix . 'successMessage'])
+                    ? $this->modx->placeholders[$plPrefix . 'successMessage']
+                    : 'fetchit_success_submit');
             $status = 'success';
         }
 
