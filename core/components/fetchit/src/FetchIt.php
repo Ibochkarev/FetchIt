@@ -52,7 +52,7 @@ class FetchIt
 
     public function isProtectEnabled()
     {
-        return (bool)$this->modx->getOption('fetchit.protect.enabled', null, true, true);
+        return (bool)$this->modx->getOption('fetchit.protect.enabled', null, true);
     }
 
 
@@ -102,6 +102,9 @@ class FetchIt
      */
     protected function writeActionProperties($action, array $scriptProperties)
     {
+        $forCache = $scriptProperties;
+        unset($forCache['_token']);
+
         if (!empty(session_id())) {
             if (!isset($_SESSION['FetchIt'])) {
                 $_SESSION['FetchIt'] = array();
@@ -109,9 +112,10 @@ class FetchIt
             $_SESSION['FetchIt'][$action] = $scriptProperties;
         }
 
+        // Never put one-time tokens into the shared cache key.
         $this->modx->cacheManager->set(
             $this->getActionPropertiesCacheKey($action),
-            $scriptProperties,
+            $forCache,
             3600
         );
     }
@@ -288,7 +292,7 @@ class FetchIt
         if ($isAjax) {
             $before = $this->runBeforeProcessEvent($action, $fields, $scriptProperties);
             if ($before !== true) {
-                return $before;
+                return $this->attachNewTokenToResponse($before);
             }
         }
 
@@ -316,7 +320,9 @@ class FetchIt
 
             return $this->attachNewTokenToResponse($response);
         } else {
-            return $this->error('fetchit_err_snippet_nf', array(), array('name' => $name));
+            return $this->attachNewTokenToResponse(
+                $this->error('fetchit_err_snippet_nf', array(), array('name' => $name))
+            );
         }
     }
 
@@ -360,22 +366,32 @@ class FetchIt
      */
     protected function runBeforeProcessEvent($action, array &$fields, array $scriptProperties)
     {
-        $this->modx->invokeEvent('OnFetchItBeforeProcess', array(
+        $outputs = $this->modx->invokeEvent('OnFetchItBeforeProcess', array(
             'action' => $action,
             'fields' => &$fields,
             'scriptProperties' => $scriptProperties,
             'FetchIt' => $this,
         ));
 
-        if (empty($this->modx->event->returnedValues) || !is_array($this->modx->event->returnedValues)) {
-            return true;
+        $values = array();
+        if (is_array($outputs)) {
+            $values = array_merge($values, $outputs);
+        }
+        if (!empty($this->modx->event->returnedValues) && is_array($this->modx->event->returnedValues)) {
+            $values = array_merge($values, $this->modx->event->returnedValues);
         }
 
-        foreach ($this->modx->event->returnedValues as $value) {
+        foreach ($values as $value) {
             if ($value === false) {
                 return $this->error('fetchit_err_before_process');
             }
             if (is_string($value) && $value !== '') {
+                // Plugin may already return JSON via $modx->event->output().
+                $decoded = json_decode($value, true);
+                if (is_array($decoded) && array_key_exists('success', $decoded)) {
+                    return $value;
+                }
+
                 return $this->error($value);
             }
             if (is_array($value) && array_key_exists('success', $value) && !$value['success']) {
