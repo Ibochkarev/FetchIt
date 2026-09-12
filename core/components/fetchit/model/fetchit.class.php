@@ -2,11 +2,13 @@
 
 class FetchIt
 {
-    public $version = '1.1.3';
+    public $version = '1.1.4';
     /** @var modX $modx */
     public $modx;
     /** @var array $config */
     public $config;
+    /** @var string|null Rotated token to return after AJAX process */
+    protected $pendingNewToken = null;
 
 
     /**
@@ -47,6 +49,78 @@ class FetchIt
 
 
     /**
+     * Whether connector submit-token protection is enabled.
+     *
+     * @return bool
+     */
+    public function isProtectEnabled()
+    {
+        return (bool)$this->modx->getOption('fetchit.protect.enabled', null, true, true);
+    }
+
+
+    /**
+     * @return string
+     */
+    protected function generateActionToken()
+    {
+        try {
+            return bin2hex(random_bytes(16));
+        } catch (Exception $e) {
+            return md5(uniqid((string)mt_rand(), true));
+        }
+    }
+
+
+    /**
+     * Ensure an action has a submit token in session/cache storage; return it.
+     *
+     * @param string $action
+     *
+     * @return string
+     */
+    public function ensureActionToken($action)
+    {
+        $stored = $this->loadActionProperties($action);
+        if (is_array($stored) && !empty($stored['_token']) && is_string($stored['_token'])) {
+            return $stored['_token'];
+        }
+
+        $token = $this->generateActionToken();
+        if (!is_array($stored)) {
+            $stored = array();
+        }
+        $stored['_token'] = $token;
+        $this->writeActionProperties($action, $stored);
+
+        return $token;
+    }
+
+
+    /**
+     * Write action properties to session and/or cache (always mirror to cache when protecting).
+     *
+     * @param string $action
+     * @param array $scriptProperties
+     */
+    protected function writeActionProperties($action, array $scriptProperties)
+    {
+        if (!empty(session_id())) {
+            if (!isset($_SESSION['FetchIt'])) {
+                $_SESSION['FetchIt'] = array();
+            }
+            $_SESSION['FetchIt'][$action] = $scriptProperties;
+        }
+
+        $this->modx->cacheManager->set(
+            $this->getActionPropertiesCacheKey($action),
+            $scriptProperties,
+            3600
+        );
+    }
+
+
+    /**
      * Independent registration of JavaScripts
      */
     public function loadScript($action)
@@ -55,7 +129,7 @@ class FetchIt
             $_SESSION['fetchit_called'] = true;
         }
 
-        $config = $this->modx->toJSON([
+        $configPayload = [
             'action' => $action,
             'assetsUrl' => $this->config['assetsUrl'],
             'actionUrl' => str_replace('[[+assetsUrl]]', $this->config['assetsUrl'], $this->config['actionUrl']),
@@ -66,7 +140,13 @@ class FetchIt
             'pageId' => !empty($this->modx->resource)
                 ? $this->modx->resource->get('id')
                 : 0,
-        ]);
+        ];
+
+        if ($this->isProtectEnabled()) {
+            $configPayload['token'] = $this->ensureActionToken($action);
+        }
+
+        $config = $this->modx->toJSON($configPayload);
         $js_classname = trim($this->modx->getOption('fetchit.frontend.js.classname', null, 'FetchIt', true));
         $this->modx->regClientHTMLBlock("<script>window.addEventListener('DOMContentLoaded', () => {$js_classname}.create($config));</script>");
     }
@@ -140,19 +220,16 @@ class FetchIt
             }
         }
 
-        if (!empty(session_id())) {
-            if (!isset($_SESSION['FetchIt'])) {
-                $_SESSION['FetchIt'] = array();
+        if ($this->isProtectEnabled()) {
+            $existing = $this->loadActionProperties($action);
+            if (is_array($existing) && !empty($existing['_token']) && is_string($existing['_token'])) {
+                $scriptProperties['_token'] = $existing['_token'];
+            } else {
+                $scriptProperties['_token'] = $this->generateActionToken();
             }
-            $_SESSION['FetchIt'][$action] = $scriptProperties;
-            return;
         }
 
-        $this->modx->cacheManager->set(
-            $this->getActionPropertiesCacheKey($action),
-            $scriptProperties,
-            3600
-        );
+        $this->writeActionProperties($action, $scriptProperties);
     }
 
 
@@ -194,11 +271,29 @@ class FetchIt
             return $this->error('fetchit_err_action_nf');
         }
 
+        $isAjax = !empty($_SERVER['HTTP_X_FETCHIT_ACTION']);
+        $this->pendingNewToken = null;
+
+        if ($isAjax && $this->isProtectEnabled()) {
+            $tokenCheck = $this->validateAndRotateActionToken($action, $stored);
+            if ($tokenCheck !== true) {
+                return $tokenCheck;
+            }
+        }
+
         // Do not set FetchIt=>$this here (PDO in session, #17).
         // Custom snippets: $modx->getService('fetchit', 'FetchIt', MODX_CORE_PATH . 'components/fetchit/model/', []).
+        unset($stored['_token']);
         $scriptProperties = array_merge($stored, array(
             'fields' => $fields,
         ));
+
+        if ($isAjax) {
+            $before = $this->runBeforeProcessEvent($action, $fields, $scriptProperties);
+            if ($before !== true) {
+                return $before;
+            }
+        }
 
         $name = $scriptProperties['snippet'];
         $set = '';
@@ -222,10 +317,120 @@ class FetchIt
                 $response = $this->handleFormIt($scriptProperties);
             }
 
-            return $response;
+            return $this->attachNewTokenToResponse($response);
         } else {
             return $this->error('fetchit_err_snippet_nf', array(), array('name' => $name));
         }
+    }
+
+
+    /**
+     * Validate X-FetchIt-Token, rotate stored token on success.
+     *
+     * @param string $action
+     * @param array $stored
+     *
+     * @return true|string
+     */
+    protected function validateAndRotateActionToken($action, array &$stored)
+    {
+        $expected = isset($stored['_token']) ? (string)$stored['_token'] : '';
+        $provided = isset($_SERVER['HTTP_X_FETCHIT_TOKEN'])
+            ? (string)$_SERVER['HTTP_X_FETCHIT_TOKEN']
+            : '';
+
+        if ($expected === '' || $provided === '' || !hash_equals($expected, $provided)) {
+            return $this->error('fetchit_err_token');
+        }
+
+        $newToken = $this->generateActionToken();
+        $stored['_token'] = $newToken;
+        $this->writeActionProperties($action, $stored);
+        $this->pendingNewToken = $newToken;
+
+        return true;
+    }
+
+
+    /**
+     * Allow plugins (IskWaf, custom) to abort AJAX processing without patching action.php.
+     *
+     * @param string $action
+     * @param array $fields
+     * @param array $scriptProperties
+     *
+     * @return true|string
+     */
+    protected function runBeforeProcessEvent($action, array &$fields, array $scriptProperties)
+    {
+        $this->modx->invokeEvent('OnFetchItBeforeProcess', array(
+            'action' => $action,
+            'fields' => &$fields,
+            'scriptProperties' => $scriptProperties,
+            'FetchIt' => $this,
+        ));
+
+        if (empty($this->modx->event->returnedValues) || !is_array($this->modx->event->returnedValues)) {
+            return true;
+        }
+
+        foreach ($this->modx->event->returnedValues as $value) {
+            if ($value === false) {
+                return $this->error('fetchit_err_before_process');
+            }
+            if (is_string($value) && $value !== '') {
+                return $this->error($value);
+            }
+            if (is_array($value) && array_key_exists('success', $value) && !$value['success']) {
+                $message = !empty($value['message']) ? $value['message'] : 'fetchit_err_before_process';
+                $data = !empty($value['data']) && is_array($value['data']) ? $value['data'] : array();
+
+                return $this->error($message, $data);
+            }
+        }
+
+        return true;
+    }
+
+
+    /**
+     * @param array|string $response
+     *
+     * @return array|string
+     */
+    protected function attachNewTokenToResponse($response)
+    {
+        if ($this->pendingNewToken === null || $this->pendingNewToken === '') {
+            return $response;
+        }
+
+        $token = $this->pendingNewToken;
+        $this->pendingNewToken = null;
+
+        if (is_array($response)) {
+            if (!isset($response['data']) || !is_array($response['data'])) {
+                $response['data'] = array();
+            }
+            $response['data']['newToken'] = $token;
+
+            return $response;
+        }
+
+        if (is_string($response) && $response !== '') {
+            $decoded = json_decode($response, true);
+            if (is_array($decoded)) {
+                if (!isset($decoded['data']) || !is_array($decoded['data'])) {
+                    $decoded['data'] = array();
+                }
+                $decoded['data']['newToken'] = $token;
+
+                return $this->config['json_response']
+                    ? $this->modx->toJSON($decoded)
+                    : $decoded;
+            }
+        }
+
+        return $response;
     }
 
 

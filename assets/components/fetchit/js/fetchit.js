@@ -20,19 +20,29 @@
       this.form = form;
       this.config = config;
 
-      this.request = new Request(this.config.actionUrl, {
-        method: 'post',
-        credentials: 'same-origin',
-        headers: {
-          'Accept': 'application/json',
-          'X-FetchIt-Action': this.config.action,
-        },
-      });
-
       this.prepareEvents();
 
       FetchIt.forms.push(this.form);
       FetchIt.instances.set(this.form, this);
+    }
+
+    getRequestHeaders() {
+      const headers = {
+        'Accept': 'application/json',
+        'X-FetchIt-Action': this.config.action,
+      };
+
+      if (this.config.token) {
+        headers['X-FetchIt-Token'] = this.config.token;
+      }
+
+      return headers;
+    }
+
+    applyNewToken(response) {
+      if (response && response.data && response.data.newToken) {
+        this.config.token = response.data.newToken;
+      }
     }
 
     prepareEvents() {
@@ -63,8 +73,14 @@
         this.disableFields();
 
         try {
-          const query = await fetch(this.request, { body: this.formData });
+          const query = await fetch(this.config.actionUrl, {
+            method: 'post',
+            credentials: 'same-origin',
+            headers: this.getRequestHeaders(),
+            body: this.formData,
+          });
           const response = await query.json();
+          this.applyNewToken(response);
 
           const afterEvent = new CustomEvent(FetchIt.events.after, {
             cancelable: true,
@@ -99,8 +115,8 @@
               return;
             }
 
-            for (const [ name, message ] of Object.entries(response.data)) {
-              if (!FetchIt.hasErrorMessage(message)) {
+            for (const [ name, message ] of Object.entries(response.data || {})) {
+              if (name === 'newToken' || !FetchIt.hasErrorMessage(message)) {
                 continue;
               }
 

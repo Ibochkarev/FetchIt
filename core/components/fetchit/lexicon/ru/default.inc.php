@@ -17,4 +17,6 @@ $_lang['fetchit_err_chunk_nf'] = 'Не могу найти указанный ч
 $_lang['fetchit_err_snippet_ns'] = 'Не указан сниппет для обработки формы.';
 $_lang['fetchit_err_snippet_nf'] = 'Не могу найти указанный сниппет "[[+name]]" для обработки формы.';
 $_lang['fetchit_err_has_errors'] = 'Форма содержит ошибки';
+$_lang['fetchit_err_token'] = 'Неверный или просроченный токен отправки формы. Обновите страницу и попробуйте снова.';
+$_lang['fetchit_err_before_process'] = 'Отправка формы отклонена.';
 $_lang['fetchit_success_submit'] = 'Форма успешно отправлена';

@@ -27,6 +27,7 @@ FetchIt не тянет внешних JS-библиотек. У AjaxForm их �
 - **FormIt из коробки.** Параметры вроде `&hooks`, `&validate`, `&emailTo` передаются в FormIt без обёрток.
 - **Свой сниппет.** В `&snippet` указываете обработчик, который возвращает JSON (`success`, `message`, `data`).
 - **Ошибки полей.** Элементы с `data-error="fieldName"` получают текст валидации; к полям можно повесить CSS-классы из системных настроек.
+- **Защита коннектора.** По умолчанию AJAX требует одноразовый `X-FetchIt-Token` (настройка `fetchit.protect.enabled`). Плагины могут подписаться на `OnFetchItBeforeProcess` без правки `action.php`.
 - **События.** `fetchit:before` (можно отменить отправку и дополнить `FormData`), `fetchit:after`, `fetchit:success`, `fetchit:error`, `fetchit:reset`.
 - **Уведомления.** Свой `FetchIt.Message` или встроенный [Notyf](https://carlosroso.com/notyf/) через настройку `fetchit.frontend.default.notifier`.
 - **Несколько форм на странице.** Каждая форма получает свой `data-fetchit` и экземпляр обработчика.
@@ -53,7 +54,7 @@ FetchIt не тянет внешних JS-библиотек. У AjaxForm их �
 | `master` | 1.x | 2.x |
 | `next` | 3.x | 3.x |
 
-На [extras.modx.com](https://extras.modx.com/package/fetchit): **3.1.2-pl** (MODX 3) и **1.1.2-pl** (MODX 2).
+На [extras.modx.com](https://extras.modx.com/package/fetchit): **3.1.4-pl** (MODX 3) и **1.1.3-pl** (MODX 2). Ветка `master` готовит **1.1.4**.
 
 ## Документация
 
