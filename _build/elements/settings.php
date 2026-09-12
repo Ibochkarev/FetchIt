@@ -26,4 +26,9 @@ return [
         'value' => 0,
         'area' => 'fetchit_main',
     ],
+    'protect.enabled' => [
+        'xtype' => 'combo-boolean',
+        'value' => true,
+        'area' => 'fetchit_main',
+    ],
 ];

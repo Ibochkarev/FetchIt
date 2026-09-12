@@ -17,4 +17,6 @@ $_lang['fetchit_err_chunk_nf'] = 'Chunk not found with name "[[+name]]".';
 $_lang['fetchit_err_snippet_ns'] = 'Snippet not specified.';
 $_lang['fetchit_err_snippet_nf'] = 'Snippet not found with name "[[+name]]".';
 $_lang['fetchit_err_has_errors'] = 'The form has errors';
+$_lang['fetchit_err_token'] = 'Invalid or expired form submit token. Refresh the page and try again.';
+$_lang['fetchit_err_before_process'] = 'Form submission was rejected.';
 $_lang['fetchit_success_submit'] = 'The form has been successfully submitted';

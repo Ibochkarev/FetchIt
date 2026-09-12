@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.5] - 2026-09-12
+
+### Added
+
+- Connector submit-token protection (`fetchit.protect.enabled`, default on). AJAX requests must send `X-FetchIt-Token`; the token rotates after each attempt so a saved session cookie alone cannot replay `action.php`.
+- System event `OnFetchItBeforeProcess` for plugins (e.g. IskWaf) to inspect or abort AJAX submits without patching `action.php`.
+
 ## [3.1.4] - 2026-09-09
 
 ### Fixed

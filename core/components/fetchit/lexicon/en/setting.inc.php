@@ -8,3 +8,5 @@ $_lang['setting_fetchit.frontend.input.invalid.class'] = 'CSS class that will be
 $_lang['setting_fetchit.frontend.custom.invalid.class'] = 'CSS class that will be added to invalid custom element.';
 $_lang['setting_fetchit.frontend.default.notifier'] = 'Load the default notification library.';
 $_lang['setting_fetchit.frontend.default.notifier_desc'] = 'If you select "Yes", FetchIt will load notification library <a href="https://carlosroso.com/notyf/">Notyf</a>.';
+$_lang['setting_fetchit.protect.enabled'] = 'Protect the connector with a submit token.';
+$_lang['setting_fetchit.protect.enabled_desc'] = 'When enabled, AJAX calls to action.php require a one-time token from the form config (X-FetchIt-Token header). This blocks replay with a saved session cookie. Plugins can also listen to OnFetchItBeforeProcess.';

@@ -27,6 +27,7 @@ FetchIt не подключает внешние JS-библиотеки. У Aja
 - FormIt без обёрток: `&hooks`, `&validate`, `&emailTo` и остальные параметры уходят в FormIt как есть.
 - Свой обработчик в `&snippet`: сниппет возвращает JSON с `success`, `message`, `data`.
 - Ошибки полей: текст в элементах с `data-error="fieldName"`, CSS-классы для полей задаются системными настройками.
+- Защита коннектора: по умолчанию AJAX требует одноразовый `X-FetchIt-Token` (`fetchit.protect.enabled`). Плагины могут подписаться на `OnFetchItBeforeProcess` без правки `action.php`.
 - Сообщения формы: после AJAX обновляются блоки `[data-success]` и `[data-validation-error]`.
 - События: `fetchit:before` (можно отменить отправку и дописать `FormData`), `fetchit:after`, `fetchit:success`, `fetchit:error`, `fetchit:reset`.
 - Уведомления: свой `FetchIt.Message` или встроенный [Notyf](https://carlosroso.com/notyf/) через `fetchit.frontend.default.notifier`.
@@ -54,7 +55,7 @@ FetchIt не подключает внешние JS-библиотеки. У Aja
 | `master` | 1.x | 2.x |
 | `next` | 3.x | 3.x |
 
-На [extras.modx.com](https://extras.modx.com/package/fetchit) сейчас **3.1.2-pl** (MODX 3) и **1.1.3-pl** (MODX 2). В ветке `next` идёт **3.1.4**.
+На [extras.modx.com](https://extras.modx.com/package/fetchit) сейчас **3.1.4-pl** (MODX 3) и **1.1.3-pl** (MODX 2). В ветке `next` идёт **3.1.5**.
 
 ## Документация
 

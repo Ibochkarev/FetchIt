@@ -1,6 +1,6 @@
 {
   "name": "fetchit",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "description": "MODX Revolution extra for submitting forms with the Fetch API",
   "type": "module",
   "main": ".assets/components/fetchit/js/fetchit.js",
